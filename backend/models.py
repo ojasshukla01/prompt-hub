@@ -1,14 +1,18 @@
-from sqlalchemy import Column, String, Text, Enum, ForeignKey, DateTime, func, Table
+from sqlalchemy import Column, String, Text, Enum, ForeignKey, DateTime, func, Table, Boolean
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, JSONB
 from sqlalchemy.orm import relationship
 import enum
 import uuid
-
+from pydantic import BaseModel
 from database import Base
 
 class VisibilityEnum(enum.Enum):
     public = "public"
     private = "private"
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 class User(Base):
     __tablename__ = "users"
@@ -17,8 +21,10 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
     profile_picture = Column(String, nullable=True)
     bio = Column(Text, nullable=True)
+    role = Column(String, default="user")  # 👈 role field
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -72,3 +78,4 @@ class Follow(Base):
 
     follower = relationship("User", foreign_keys=[follower_id], back_populates="following")
     following = relationship("User", foreign_keys=[following_id], back_populates="followers")
+

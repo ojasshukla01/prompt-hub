@@ -6,6 +6,7 @@ from typing import List
 from pydantic import BaseModel
 import uuid
 from dependencies import get_current_user
+import schemas
 
 router = APIRouter(
     prefix="/prompts",
@@ -29,9 +30,9 @@ class PromptResponse(BaseModel):
     class Config:
         from_attributes = True
 
-@router.get("/", response_model=List[PromptResponse])
-def get_prompts(db: Session = Depends(get_db)):
-    prompts = db.query(Prompt).all()
+@router.get("/", response_model=List[schemas.PromptResponse])
+def get_prompts(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    prompts = db.query(Prompt).offset(skip).limit(limit).all()
     return prompts
 
 @router.post("/", response_model=PromptResponse)
@@ -62,10 +63,13 @@ def update_prompt(prompt_id: uuid.UUID, prompt: PromptCreate, db: Session = Depe
     return db_prompt
 
 @router.delete("/{prompt_id}")
-def delete_prompt(prompt_id: uuid.UUID, db: Session = Depends(get_db)):
-    db_prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
-    if not db_prompt:
+@router.delete("/{prompt_id}")
+def delete_prompt(prompt_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
-    db.delete(db_prompt)
+    if current_user.id != prompt.author_id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    db.delete(prompt)
     db.commit()
-    return {"message": "Prompt deleted"}
+    return {"message": "Deleted"}
