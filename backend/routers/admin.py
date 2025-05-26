@@ -22,3 +22,7 @@ def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db), admin_user: U
     db.delete(user)
     db.commit()
     return {"message": "User deleted successfully."}
+
+@router.get("/admin-only-data")
+def admin_data(current_user: User = Depends(get_current_active_admin_user)):
+    return {"message": "Only admins can see this!"}

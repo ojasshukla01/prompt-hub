@@ -30,29 +30,22 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     prompts = relationship("Prompt", back_populates="author")
-    comments = relationship("Comment", back_populates="author")
-    
-    followers_associations = relationship(
-        "Follow",
-        foreign_keys="[Follow.following_id]",
-        back_populates="following",
-        overlaps="followers"
-    )
-    following_associations = relationship(
-        "Follow",
-        foreign_keys="[Follow.follower_id]",
-        back_populates="follower",
-        overlaps="following"
-    )
+    comments = relationship("Comment", back_populates="author", cascade="all, delete-orphan")
+    likes = relationship("Like", back_populates="user", cascade="all, delete-orphan")
+    followers_associations = relationship("Follow", back_populates="following_user", foreign_keys="Follow.following_id")
+    following_associations = relationship("Follow", back_populates="follower_user", foreign_keys="Follow.follower_id")
 
-    followers = relationship(
-        "User",
-        secondary="follows",
-        primaryjoin="User.id==Follow.following_id",
-        secondaryjoin="User.id==Follow.follower_id",
-        backref="following",
-        overlaps="followers_associations,following_associations"
-    )
+    followers = relationship("User",
+                             secondary="follows",
+                             primaryjoin="User.id==Follow.following_id",
+                             secondaryjoin="User.id==Follow.follower_id",
+                             viewonly=True)
+
+    following = relationship("User",
+                             secondary="follows",
+                             primaryjoin="User.id==Follow.follower_id",
+                             secondaryjoin="User.id==Follow.following_id",
+                             viewonly=True)
     
 class Prompt(Base):
     __tablename__ = "prompts"
@@ -68,7 +61,8 @@ class Prompt(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     author = relationship("User", back_populates="prompts")
-    comments = relationship("Comment", back_populates="prompt")
+    comments = relationship("Comment", back_populates="prompt", cascade="all, delete-orphan")
+    likes = relationship("Like", back_populates="prompt", cascade="all, delete-orphan")
 
 
 class Follow(Base):
@@ -79,35 +73,30 @@ class Follow(Base):
     follower_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
     following_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
 
-    follower = relationship(
-        "User",
-        foreign_keys=[follower_id],
-        back_populates="following_associations",
-        overlaps="following"
-    )
+    follower_user = relationship("User", back_populates="following_associations", foreign_keys=[follower_id])
+    following_user = relationship("User", back_populates="followers_associations", foreign_keys=[following_id])
 
-    following = relationship(
-        "User",
-        foreign_keys=[following_id],
-        back_populates="followers_associations",
-        overlaps="followers"
-    )
 
 class Comment(Base):
     __tablename__ = "comments"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     content = Column(String, nullable=False)
-    author_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    prompt_id = Column(UUID(as_uuid=True), ForeignKey("prompts.id", ondelete="CASCADE"))
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    author_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    prompt_id = Column(UUID(as_uuid=True), ForeignKey("prompts.id"), nullable=False)
 
     author = relationship("User", back_populates="comments")
     prompt = relationship("Prompt", back_populates="comments")
 
 
+
 class Like(Base):
     __tablename__ = "likes"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
-    prompt_id = Column(UUID(as_uuid=True), ForeignKey("prompts.id", ondelete="CASCADE"))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    prompt_id = Column(UUID(as_uuid=True), ForeignKey("prompts.id"), nullable=False)
+
+    user = relationship("User", back_populates="likes")
+    prompt = relationship("Prompt", back_populates="likes")
+

@@ -6,7 +6,7 @@ from typing import List
 from pydantic import BaseModel
 import uuid
 from uuid import UUID
-from models import Comment, Like, Prompt
+from models import Comment, Like, Prompt, User
 from schemas import CommentCreate, CommentResponse, LikeResponse
 from dependencies import get_current_active_admin_user, get_current_user
 
@@ -28,24 +28,20 @@ class CommentResponse(BaseModel):
     class Config:
         orm_mode = True
 
-@router.get("/prompt/{prompt_id}", response_model=List[CommentResponse])
-def get_comments(prompt_id: uuid.UUID, db: Session = Depends(get_db)):
-    comments = db.query(Comment).filter(Comment.prompt_id == prompt_id).all()
-    return comments
-
 @router.post("/", response_model=CommentResponse)
-def create_comment(comment: CommentCreate, db: Session = Depends(get_db)):
-    # In real implementation, get author_id from auth
-    author_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
-    db_comment = Comment(
-        prompt_id=comment.prompt_id,
-        content=comment.content,
-        author_id=author_id
-    )
-    db.add(db_comment)
+def create_comment(comment: CommentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    prompt = db.query(Prompt).filter(Prompt.id == comment.prompt_id).first()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found.")
+    new_comment = Comment(content=comment.content, prompt_id=prompt.id, author_id=current_user.id)
+    db.add(new_comment)
     db.commit()
-    db.refresh(db_comment)
-    return db_comment
+    db.refresh(new_comment)
+    return new_comment
+
+@router.get("/prompt/{prompt_id}", response_model=list[CommentResponse])
+def get_comments(prompt_id: str, db: Session = Depends(get_db)):
+    return db.query(Comment).filter(Comment.prompt_id == prompt_id).all()
 
 # Example: Adding admin delete for comments
 @router.delete("/{comment_id}")
