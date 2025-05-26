@@ -49,3 +49,26 @@ class FollowResponse(BaseModel):
 
     class Config:
         orm_mode = True
+        
+class CommentCreate(BaseModel):
+    content: str
+
+class CommentResponse(BaseModel):
+    id: UUID
+    content: str
+    author_id: UUID
+    prompt_id: UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class LikeResponse(BaseModel):
+    id: UUID
+    user_id: UUID
+    prompt_id: UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True

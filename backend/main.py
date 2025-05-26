@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import prompts, users, comments, follows, auth
+from routers import prompts, users, comments, follows, auth, admin
 from database import Base, engine
 from fastapi.middleware.cors import CORSMiddleware
 from auth import router as auth_router
@@ -12,6 +12,7 @@ app.include_router(users.router)
 app.include_router(comments.router)
 app.include_router(follows.router)
 app.include_router(auth.router)
+app.include_router(admin.router)
 
 # Allow frontend requests from localhost:3000
 app.add_middleware(

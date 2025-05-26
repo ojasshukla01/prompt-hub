@@ -31,17 +31,29 @@ class User(Base):
 
     prompts = relationship("Prompt", back_populates="author")
     comments = relationship("Comment", back_populates="author")
-    following = relationship(
-        "Follow",
-        foreign_keys="[Follow.follower_id]",
-        back_populates="follower",
-    )
-    followers = relationship(
+    
+    followers_associations = relationship(
         "Follow",
         foreign_keys="[Follow.following_id]",
         back_populates="following",
+        overlaps="followers"
+    )
+    following_associations = relationship(
+        "Follow",
+        foreign_keys="[Follow.follower_id]",
+        back_populates="follower",
+        overlaps="following"
     )
 
+    followers = relationship(
+        "User",
+        secondary="follows",
+        primaryjoin="User.id==Follow.following_id",
+        secondaryjoin="User.id==Follow.follower_id",
+        backref="following",
+        overlaps="followers_associations,following_associations"
+    )
+    
 class Prompt(Base):
     __tablename__ = "prompts"
 
@@ -58,25 +70,44 @@ class Prompt(Base):
     author = relationship("User", back_populates="prompts")
     comments = relationship("Comment", back_populates="prompt")
 
-class Comment(Base):
-    __tablename__ = "comments"
-
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    prompt_id = Column(UUID(as_uuid=True), ForeignKey("prompts.id"))
-    author_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    content = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    prompt = relationship("Prompt", back_populates="comments")
-    author = relationship("User", back_populates="comments")
 
 class Follow(Base):
     __tablename__ = "follows"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    follower_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    following_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    follower_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    following_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+
+    follower = relationship(
+        "User",
+        foreign_keys=[follower_id],
+        back_populates="following_associations",
+        overlaps="following"
+    )
+
+    following = relationship(
+        "User",
+        foreign_keys=[following_id],
+        back_populates="followers_associations",
+        overlaps="followers"
+    )
+
+class Comment(Base):
+    __tablename__ = "comments"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    content = Column(String, nullable=False)
+    author_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    prompt_id = Column(UUID(as_uuid=True), ForeignKey("prompts.id", ondelete="CASCADE"))
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    follower = relationship("User", foreign_keys=[follower_id], backref="following_associations")
-    following = relationship("User", foreign_keys=[following_id], backref="followers_associations")
+    author = relationship("User", back_populates="comments")
+    prompt = relationship("Prompt", back_populates="comments")
 
+
+class Like(Base):
+    __tablename__ = "likes"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"))
+    prompt_id = Column(UUID(as_uuid=True), ForeignKey("prompts.id", ondelete="CASCADE"))
+    created_at = Column(DateTime, default=datetime.utcnow)
