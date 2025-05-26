@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Comment, Prompt
+from models import Comment, Prompt, User
 from typing import List
 from pydantic import BaseModel
 import uuid
+from dependencies import get_current_active_admin_user
 
 router = APIRouter(
     prefix="/comments",
@@ -42,3 +43,14 @@ def create_comment(comment: CommentCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(db_comment)
     return db_comment
+
+# Example: Adding admin delete for comments
+@router.delete("/{comment_id}")
+def delete_comment(comment_id: uuid.UUID, db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_active_admin_user)):
+    db_comment = db.query(Comment).filter(Comment.id == comment_id).first()
+    if not db_comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+    db.delete(db_comment)
+    db.commit()
+    return {"message": "Comment deleted"}

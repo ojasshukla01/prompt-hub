@@ -4,7 +4,7 @@ from database import get_db
 from models import User
 from utils import verify_password, create_access_token, hash_password
 from pydantic import BaseModel
-from dependencies import get_current_user
+from dependencies import get_current_user, get_current_active_admin_user
 from typing import List
 import uuid
 import schemas
@@ -91,3 +91,35 @@ def check_admin(current_user: User = Depends(get_current_user)):
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Admins only!")
     return {"message": "You are an admin!"}
+
+# GET ALL USERS (ADMIN ONLY)
+@router.get("/", response_model=List[UserResponse])
+def get_all_users(db: Session = Depends(get_db),
+                   current_user: User = Depends(get_current_active_admin_user)):
+    users = db.query(User).all()
+    return users
+
+# UPDATE USER (ADMIN ONLY)
+@router.put("/{user_id}", response_model=UserResponse)
+def update_user(user_id: uuid.UUID, user_data: UserCreate, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_active_admin_user)):
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db_user.username = user_data.username
+    db_user.email = user_data.email
+    db_user.role = user_data.role
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+# DELETE USER (ADMIN ONLY)
+@router.delete("/{user_id}")
+def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db),
+                 current_user: User = Depends(get_current_active_admin_user)):
+    db_user = db.query(User).filter(User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    db.delete(db_user)
+    db.commit()
+    return {"message": "User deleted"}
