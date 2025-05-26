@@ -1,14 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
-from typing import List
-from pydantic import BaseModel, EmailStr
-import uuid
-from utils import hash_password  # Use hashing!
-from utils import verify_password, create_access_token
-from fastapi import status
+from utils import verify_password, create_access_token, hash_password
+from pydantic import BaseModel
 from dependencies import get_current_user
+from typing import List
+import uuid
 import schemas
 
 router = APIRouter(
@@ -16,6 +14,7 @@ router = APIRouter(
     tags=["Users"]
 )
 
+# --- Request/Response Schemas ---
 class UserLogin(BaseModel):
     username: str
     password: str
@@ -26,29 +25,37 @@ class UserCreate(BaseModel):
     password: str
 
 class UserResponse(BaseModel):
-    id: str
+    id: uuid.UUID
     username: str
-    email: EmailStr
+    email: str
     is_active: bool
 
     class Config:
         orm_mode = True
 
-@router.post("/users/")
+# --- Login Endpoint ---
+@router.post("/login")
+def login(user: UserLogin, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if not db_user or not verify_password(user.password, db_user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+
+    access_token = create_access_token(data={"sub": str(db_user.id)})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# --- Create User Endpoint ---
+@router.post("/", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    hashed_pwd = hash_password(user.password)
-    db_user = User(
-        id=uuid.uuid4(),
+    hashed_password = hash_password(user.password)
+    new_user = User(
         username=user.username,
         email=user.email,
-        bio=user.bio,
-        profile_picture=user.profile_picture,
-        hashed_password=hashed_pwd
+        hashed_password=hashed_password
     )
-    db.add(db_user)
+    db.add(new_user)
     db.commit()
-    db.refresh(db_user)
-    return db_user
+    db.refresh(new_user)
+    return new_user
 
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
@@ -56,22 +63,6 @@ def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
-
-@router.post("/login")
-def login(login_request: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == login_request.username).first()
-    
-    if not user or not verify_password(login_request.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # Create JWT token
-    access_token = create_access_token(data={"sub": str(user.id)})
-    
-    return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login", response_model=schemas.TokenResponse)
 def login_user(form_data: schemas.UserCreate, db: Session = Depends(get_db)):
