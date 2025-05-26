@@ -11,10 +11,6 @@ class VisibilityEnum(enum.Enum):
     public = "public"
     private = "private"
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
 class User(Base):
     __tablename__ = "users"
 

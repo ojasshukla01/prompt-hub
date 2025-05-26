@@ -5,7 +5,7 @@ from models import Prompt, User
 from typing import List
 from pydantic import BaseModel
 import uuid
-from dependencies import get_current_user, get_current_active_admin_user
+from dependencies import get_current_active_admin_user, get_current_user
 import schemas
 
 router = APIRouter(
@@ -49,10 +49,9 @@ def create_prompt(prompt: PromptCreate, db: Session = Depends(get_db), current_u
     db.refresh(db_prompt)
     return db_prompt
 
-# UPDATE UPDATE PROMPT TO USE ADMIN
 @router.put("/{prompt_id}")
 def update_prompt(prompt_id: uuid.UUID, prompt: PromptCreate, db: Session = Depends(get_db),
-                   current_user: User = Depends(get_current_active_admin_user)):
+                   current_user=Depends(get_current_active_admin_user)):
     db_prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
     if not db_prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")
@@ -64,10 +63,9 @@ def update_prompt(prompt_id: uuid.UUID, prompt: PromptCreate, db: Session = Depe
     db.refresh(db_prompt)
     return db_prompt
 
-# UPDATE DELETE PROMPT TO USE ADMIN
 @router.delete("/{prompt_id}")
 def delete_prompt(prompt_id: uuid.UUID, db: Session = Depends(get_db),
-                   current_user: User = Depends(get_current_active_admin_user)):
+                   current_user=Depends(get_current_active_admin_user)):
     db_prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
     if not db_prompt:
         raise HTTPException(status_code=404, detail="Prompt not found")

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User
-from utils import verify_password, create_access_token, hash_password
+from utils import hash_password
 from pydantic import BaseModel
 from dependencies import get_current_user, get_current_active_admin_user
 from typing import List
@@ -31,17 +31,8 @@ class UserResponse(BaseModel):
     is_active: bool
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
-# --- Login Endpoint ---
-@router.post("/login")
-def login(user: UserLogin, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.username == user.username).first()
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-
-    access_token = create_access_token(data={"sub": str(db_user.id)})
-    return {"access_token": access_token, "token_type": "bearer"}
 
 # --- Create User Endpoint ---
 @router.post("/", response_model=UserResponse)
@@ -57,20 +48,32 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return new_user
 
+# ⚠️ New endpoint for syncing Supabase user
+@router.post("/", response_model=UserResponse)
+def create_user_profile(user_data: UserCreate, db: Session = Depends(get_db)):
+    # Check if user already exists in local DB
+    existing_user = db.query(User).filter(User.id == user_data.id).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User already exists in local DB.")
+
+    # Create local user profile
+    new_user = User(
+        id=user_data.id,            # Supabase UID
+        username=user_data.username,
+        email=user_data.email,
+        hashed_password="",         # Supabase manages passwords
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
-
-@router.post("/login", response_model=schemas.TokenResponse)
-def login_user(form_data: schemas.UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == form_data.email).first()
-    if not db_user or not verify_password(form_data.password, db_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token({"sub": str(db_user.id)})
-    return {"access_token": token, "token_type": "bearer"}
 
 @router.get("/me", response_model=schemas.UserResponse)
 def get_profile(current_user: User = Depends(get_current_user)):

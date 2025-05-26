@@ -48,7 +48,7 @@ class FollowResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
         
 class CommentCreate(BaseModel):
     content: str
@@ -61,7 +61,7 @@ class CommentResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class LikeResponse(BaseModel):
@@ -71,4 +71,4 @@ class LikeResponse(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

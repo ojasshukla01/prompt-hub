@@ -26,7 +26,7 @@ class CommentResponse(BaseModel):
     author_id: uuid.UUID
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.post("/", response_model=CommentResponse)
 def create_comment(comment: CommentCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -53,17 +53,6 @@ def delete_comment(comment_id: uuid.UUID, db: Session = Depends(get_db),
     db.delete(db_comment)
     db.commit()
     return {"message": "Comment deleted"}
-
-@router.post("/{prompt_id}", response_model=CommentResponse)
-def add_comment(prompt_id: UUID, comment: CommentCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
-    prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
-    if not prompt:
-        raise HTTPException(status_code=404, detail="Prompt not found.")
-    new_comment = Comment(content=comment.content, author_id=current_user.id, prompt_id=prompt_id)
-    db.add(new_comment)
-    db.commit()
-    db.refresh(new_comment)
-    return new_comment
 
 @router.post("/like/{prompt_id}", response_model=LikeResponse)
 def like_prompt(prompt_id: UUID, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
