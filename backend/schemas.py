@@ -1,6 +1,8 @@
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 import uuid
+from uuid import UUID
+from datetime import datetime
 
 class UserCreate(BaseModel):
     username: str
@@ -38,3 +40,12 @@ class PromptResponse(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str
+
+class FollowResponse(BaseModel):
+    id: UUID
+    follower_id: UUID
+    following_id: UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True

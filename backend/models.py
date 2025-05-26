@@ -5,6 +5,7 @@ import enum
 import uuid
 from pydantic import BaseModel
 from database import Base
+from datetime import datetime
 
 class VisibilityEnum(enum.Enum):
     public = "public"
@@ -71,11 +72,11 @@ class Comment(Base):
 
 class Follow(Base):
     __tablename__ = "follows"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    follower_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    following_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
-    follower_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
-    following_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    follower = relationship("User", foreign_keys=[follower_id], back_populates="following")
-    following = relationship("User", foreign_keys=[following_id], back_populates="followers")
+    follower = relationship("User", foreign_keys=[follower_id], backref="following_associations")
+    following = relationship("User", foreign_keys=[following_id], backref="followers_associations")
 
