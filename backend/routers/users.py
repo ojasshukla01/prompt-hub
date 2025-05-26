@@ -5,6 +5,7 @@ from models import User
 from typing import List
 from pydantic import BaseModel
 import uuid
+from utils import hash_password  # Use hashing!
 
 router = APIRouter(
     prefix="/users",
@@ -15,7 +16,8 @@ class UserCreate(BaseModel):
     username: str
     email: str
     bio: str = ""
-
+    password: str
+    
 class UserResponse(BaseModel):
     id: uuid.UUID
     username: str
@@ -25,20 +27,20 @@ class UserResponse(BaseModel):
     class Config:
         orm_mode = True
 
-@router.post("/", response_model=UserResponse)
+@router.post("/users/")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = db.query(User).filter(User.email == user.email).first()
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    new_user = User(
+    hashed_pwd = hash_password(user.password)
+    db_user = User(
+        id=uuid.uuid4(),
         username=user.username,
         email=user.email,
-        bio=user.bio
+        bio=user.bio,
+        hashed_password=hashed_pwd
     )
-    db.add(new_user)
+    db.add(db_user)
     db.commit()
-    db.refresh(new_user)
-    return new_user
+    db.refresh(db_user)
+    return {"message": "User created!"}
 
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: uuid.UUID, db: Session = Depends(get_db)):

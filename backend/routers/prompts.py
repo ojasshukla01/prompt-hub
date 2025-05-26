@@ -5,6 +5,7 @@ from models import Prompt, User
 from typing import List
 from pydantic import BaseModel
 import uuid
+from dependencies import get_current_user
 
 router = APIRouter(
     prefix="/prompts",
@@ -26,7 +27,7 @@ class PromptResponse(BaseModel):
     author_id: uuid.UUID
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.get("/", response_model=List[PromptResponse])
 def get_prompts(db: Session = Depends(get_db)):
@@ -34,17 +35,37 @@ def get_prompts(db: Session = Depends(get_db)):
     return prompts
 
 @router.post("/", response_model=PromptResponse)
-def create_prompt(prompt: PromptCreate, db: Session = Depends(get_db)):
-    # For now, assume user_id is a placeholder (later use auth)
-    user_id = uuid.UUID("11111111-1111-1111-1111-111111111111")
+def create_prompt(prompt: PromptCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     db_prompt = Prompt(
         title=prompt.title,
         content=prompt.content,
         tags=prompt.tags,
         visibility=prompt.visibility,
-        author_id=user_id
+        author_id=current_user.id
     )
     db.add(db_prompt)
     db.commit()
     db.refresh(db_prompt)
     return db_prompt
+
+@router.put("/{prompt_id}")
+def update_prompt(prompt_id: uuid.UUID, prompt: PromptCreate, db: Session = Depends(get_db)):
+    db_prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not db_prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    db_prompt.title = prompt.title
+    db_prompt.content = prompt.content
+    db_prompt.tags = prompt.tags
+    db_prompt.visibility = prompt.visibility
+    db.commit()
+    db.refresh(db_prompt)
+    return db_prompt
+
+@router.delete("/{prompt_id}")
+def delete_prompt(prompt_id: uuid.UUID, db: Session = Depends(get_db)):
+    db_prompt = db.query(Prompt).filter(Prompt.id == prompt_id).first()
+    if not db_prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+    db.delete(db_prompt)
+    db.commit()
+    return {"message": "Prompt deleted"}

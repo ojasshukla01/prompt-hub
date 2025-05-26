@@ -2,3 +2,5 @@
 uvicorn
 psycopg2-binary
 sqlalchemy
+python-jose[cryptography]
+passlib[bcrypt]
